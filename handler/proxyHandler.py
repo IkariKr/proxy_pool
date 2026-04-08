@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """
 -------------------------------------------------
-   File Name：     ProxyHandler.py
+   File Name锛?    ProxyHandler.py
    Description :
    Author :       JHao
-   date：          2016/12/3
+   date锛?         2016/12/3
 -------------------------------------------------
    Change Activity:
                    2016/12/03:
-                   2020/05/26: 区分http和https
+                   2020/05/26: 鍖哄垎http鍜宧ttps
 -------------------------------------------------
 """
 __author__ = 'JHao'
@@ -33,7 +33,7 @@ class ProxyHandler(object):
             https: True/False
         Returns:
         """
-        proxy = self.db.get(https)
+        proxy = self.db.get(https, qualified_only=True)
         return Proxy.createFromJson(proxy) if proxy else None
 
     def pop(self, https):
@@ -61,12 +61,12 @@ class ProxyHandler(object):
         """
         return self.db.delete(proxy.proxy)
 
-    def getAll(self, https=False):
+    def getAll(self, https=False, qualified_only=True):
         """
         get all proxy from pool as Proxy list
         :return:
         """
-        proxies = self.db.getAll(https)
+        proxies = self.db.getAll(https, qualified_only=qualified_only)
         return [Proxy.createFromJson(_) for _ in proxies]
 
     def exists(self, proxy):
@@ -77,10 +77,23 @@ class ProxyHandler(object):
         """
         return self.db.exists(proxy.proxy)
 
+    def getByProxy(self, proxy_str):
+        proxy = self.db.getByKey(proxy_str)
+        return Proxy.createFromJson(proxy) if proxy else None
+
+    def findByExitIp(self, exit_ip, exclude_proxy=None):
+        for proxy in self.getAll(qualified_only=True):
+            if proxy.proxy == exclude_proxy:
+                continue
+            if proxy.exit_ip == exit_ip:
+                return proxy
+        return None
+
     def getCount(self):
         """
         return raw_proxy and use_proxy count
         :return:
         """
-        total_use_proxy = self.db.getCount()
-        return {'count': total_use_proxy}
+        qualified_count = self.db.getCount(qualified_only=True)
+        total_count = self.db.getCount(qualified_only=False)
+        return {'count': qualified_count, 'candidate_count': total_count}

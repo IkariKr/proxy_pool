@@ -79,7 +79,8 @@ def refresh():
 @app.route('/all/')
 def getAll():
     https = request.args.get("type", "").lower() == 'https'
-    proxies = proxy_handler.getAll(https)
+    qualified_only = request.args.get("scope", "").lower() != 'all'
+    proxies = proxy_handler.getAll(https, qualified_only=qualified_only)
     return jsonify([_.to_dict for _ in proxies])
 
 
@@ -92,7 +93,8 @@ def delete():
 
 @app.route('/count/')
 def getCount():
-    proxies = proxy_handler.getAll()
+    proxies = proxy_handler.getAll(qualified_only=True)
+    candidates = proxy_handler.getAll(qualified_only=False)
     http_type_dict = {}
     source_dict = {}
     for proxy in proxies:
@@ -100,7 +102,13 @@ def getCount():
         http_type_dict[http_type] = http_type_dict.get(http_type, 0) + 1
         for source in proxy.source.split('/'):
             source_dict[source] = source_dict.get(source, 0) + 1
-    return {"http_type": http_type_dict, "source": source_dict, "count": len(proxies)}
+    return {
+        "http_type": http_type_dict,
+        "source": source_dict,
+        "count": len(proxies),
+        "candidate_count": len(candidates),
+        "qualified_count": len(proxies)
+    }
 
 
 def runFlask():

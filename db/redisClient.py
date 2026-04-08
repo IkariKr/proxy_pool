@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 """
 -----------------------------------------------------
-   File Name：     redisClient.py
-   Description :   封装Redis相关操作
+   File Name锛?    redisClient.py
+   Description :   灏佽Redis鐩稿叧鎿嶄綔
    Author :        JHao
-   date：          2019/8/9
+   date锛?         2019/8/9
 ------------------------------------------------------
    Change Activity:
-                   2019/08/09: 封装Redis相关操作
-                   2020/06/23: 优化pop方法, 改用hscan命令
-                   2021/05/26: 区别http/https代理
+                   2019/08/09: 灏佽Redis鐩稿叧鎿嶄綔
+                   2020/06/23: 浼樺寲pop鏂规硶, 鏀圭敤hscan鍛戒护
+                   2021/05/26: 鍖哄埆http/https浠ｇ悊
 ------------------------------------------------------
 """
 __author__ = 'JHao'
@@ -26,8 +26,8 @@ class RedisClient(object):
     """
     Redis client
 
-    Redis中代理存放的结构为hash：
-    key为ip:port, value为代理属性的字典;
+    Redis涓唬鐞嗗瓨鏀剧殑缁撴瀯涓篽ash锛?
+    key涓篿p:port, value涓轰唬鐞嗗睘鎬х殑瀛楀吀;
 
     """
 
@@ -47,23 +47,32 @@ class RedisClient(object):
                                                                    socket_timeout=5,
                                                                    **kwargs))
 
-    def get(self, https):
+    def _filtered_items(self, https=False, qualified_only=False):
+        items = self.__conn.hvals(self.name)
+        proxies = []
+        for item in items:
+            proxy_data = json.loads(item)
+            if https and not proxy_data.get("https"):
+                continue
+            if qualified_only and not proxy_data.get("qualified"):
+                continue
+            proxies.append(item)
+        return proxies
+
+    def _choice_proxy(self, https=False, qualified_only=False):
+        proxies = self._filtered_items(https=https, qualified_only=qualified_only)
+        return choice(proxies) if proxies else None
+
+    def get(self, https, qualified_only=True):
         """
-        返回一个代理
+        杩斿洖涓€涓唬鐞?
         :return:
         """
-        if https:
-            items = self.__conn.hvals(self.name)
-            proxies = list(filter(lambda x: json.loads(x).get("https"), items))
-            return choice(proxies) if proxies else None
-        else:
-            proxies = self.__conn.hkeys(self.name)
-            proxy = choice(proxies) if proxies else None
-            return self.__conn.hget(self.name, proxy) if proxy else None
+        return self._choice_proxy(https=https, qualified_only=qualified_only)
 
     def put(self, proxy_obj):
         """
-        将代理放入hash, 使用changeTable指定hash name
+        灏嗕唬鐞嗘斁鍏ash, 浣跨敤changeTable鎸囧畾hash name
         :param proxy_obj: Proxy obj
         :return:
         """
@@ -72,17 +81,17 @@ class RedisClient(object):
 
     def pop(self, https):
         """
-        弹出一个代理
+        寮瑰嚭涓€涓唬鐞?
         :return: dict {proxy: value}
         """
-        proxy = self.get(https)
+        proxy = self.get(https, qualified_only=True)
         if proxy:
             self.__conn.hdel(self.name, json.loads(proxy).get("proxy", ""))
         return proxy if proxy else None
 
     def delete(self, proxy_str):
         """
-        移除指定代理, 使用changeTable指定hash name
+        绉婚櫎鎸囧畾浠ｇ悊, 浣跨敤changeTable鎸囧畾hash name
         :param proxy_str: proxy str
         :return:
         """
@@ -90,49 +99,52 @@ class RedisClient(object):
 
     def exists(self, proxy_str):
         """
-        判断指定代理是否存在, 使用changeTable指定hash name
+        鍒ゆ柇鎸囧畾浠ｇ悊鏄惁瀛樺湪, 浣跨敤changeTable鎸囧畾hash name
         :param proxy_str: proxy str
         :return:
         """
         return self.__conn.hexists(self.name, proxy_str)
 
+    def getByKey(self, proxy_str):
+        return self.__conn.hget(self.name, proxy_str)
+
     def update(self, proxy_obj):
         """
-        更新 proxy 属性
+        鏇存柊 proxy 灞炴€?
         :param proxy_obj:
         :return:
         """
         return self.__conn.hset(self.name, proxy_obj.proxy, proxy_obj.to_json)
 
-    def getAll(self, https):
+    def getAll(self, https=False, qualified_only=False):
         """
-        字典形式返回所有代理, 使用changeTable指定hash name
+        瀛楀吀褰㈠紡杩斿洖鎵€鏈変唬鐞? 浣跨敤changeTable鎸囧畾hash name
         :return:
         """
-        items = self.__conn.hvals(self.name)
-        if https:
-            return list(filter(lambda x: json.loads(x).get("https"), items))
-        else:
-            return items
+        return self._filtered_items(https=https, qualified_only=qualified_only)
 
     def clear(self):
         """
-        清空所有代理, 使用changeTable指定hash name
+        娓呯┖鎵€鏈変唬鐞? 浣跨敤changeTable鎸囧畾hash name
         :return:
         """
         return self.__conn.delete(self.name)
 
-    def getCount(self):
+    def getCount(self, qualified_only=False):
         """
-        返回代理数量
+        杩斿洖浠ｇ悊鏁伴噺
         :return:
         """
-        proxies = self.getAll(https=False)
-        return {'total': len(proxies), 'https': len(list(filter(lambda x: json.loads(x).get("https"), proxies)))}
+        proxies = self.getAll(https=False, qualified_only=qualified_only)
+        return {
+            'total': len(proxies),
+            'https': len(list(filter(lambda x: json.loads(x).get("https"), proxies))),
+            'qualified': len(list(filter(lambda x: json.loads(x).get("qualified"), proxies))),
+        }
 
     def changeTable(self, name):
         """
-        切换操作对象
+        鍒囨崲鎿嶄綔瀵硅薄
         :param name:
         :return:
         """
@@ -151,5 +163,3 @@ class RedisClient(object):
         except ResponseError as e:
             log.error('redis connection error: %s' % str(e), exc_info=True)
             return e
-
-

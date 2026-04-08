@@ -2,14 +2,14 @@
 # !/usr/bin/env python
 """
 -------------------------------------------------
-   File Name：    DbClient.py
-   Description :  DB工厂类
+   File Name锛?   DbClient.py
+   Description :  DB宸ュ巶绫?
    Author :       JHao
-   date：          2016/12/2
+   date锛?         2016/12/2
 -------------------------------------------------
    Change Activity:
-                   2016/12/02:   DB工厂类
-                   2020/07/03:   取消raw_proxy储存
+                   2016/12/02:   DB宸ュ巶绫?
+                   2020/07/03:   鍙栨秷raw_proxy鍌ㄥ瓨
 -------------------------------------------------
 """
 __author__ = 'JHao'
@@ -25,23 +25,23 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 class DbClient(withMetaclass(Singleton)):
     """
-    DbClient DB工厂类 提供get/put/update/pop/delete/exists/getAll/clean/getCount/changeTable方法
+    DbClient DB宸ュ巶绫?鎻愪緵get/put/update/pop/delete/exists/getAll/clean/getCount/changeTable鏂规硶
 
 
-    抽象方法定义：
-        get(): 随机返回一个proxy;
-        put(proxy): 存入一个proxy;
-        pop(): 顺序返回并删除一个proxy;
-        update(proxy): 更新指定proxy信息;
-        delete(proxy): 删除指定proxy;
-        exists(proxy): 判断指定proxy是否存在;
-        getAll(): 返回所有代理;
-        clean(): 清除所有proxy信息;
-        getCount(): 返回proxy统计信息;
-        changeTable(name): 切换操作对象
+    鎶借薄鏂规硶瀹氫箟锛?
+        get(): 闅忔満杩斿洖涓€涓猵roxy;
+        put(proxy): 瀛樺叆涓€涓猵roxy;
+        pop(): 椤哄簭杩斿洖骞跺垹闄や竴涓猵roxy;
+        update(proxy): 鏇存柊鎸囧畾proxy淇℃伅;
+        delete(proxy): 鍒犻櫎鎸囧畾proxy;
+        exists(proxy): 鍒ゆ柇鎸囧畾proxy鏄惁瀛樺湪;
+        getAll(): 杩斿洖鎵€鏈変唬鐞?
+        clean(): 娓呴櫎鎵€鏈塸roxy淇℃伅;
+        getCount(): 杩斿洖proxy缁熻淇℃伅;
+        changeTable(name): 鍒囨崲鎿嶄綔瀵硅薄
 
 
-        所有方法需要相应类去具体实现：
+        鎵€鏈夋柟娉曢渶瑕佺浉搴旂被鍘诲叿浣撳疄鐜帮細
             ssdb: ssdbClient.py
             redis: redisClient.py
             mongodb: mongodbClient.py
@@ -101,11 +101,14 @@ class DbClient(withMetaclass(Singleton)):
     def exists(self, key, **kwargs):
         return self.client.exists(key, **kwargs)
 
+    def getByKey(self, key, **kwargs):
+        return self.client.getByKey(key, **kwargs)
+
     def pop(self, https, **kwargs):
         return self.client.pop(https, **kwargs)
 
-    def getAll(self, https):
-        return self.client.getAll(https)
+    def getAll(self, https=False, **kwargs):
+        return self.client.getAll(https, **kwargs)
 
     def clear(self):
         return self.client.clear()
@@ -113,8 +116,8 @@ class DbClient(withMetaclass(Singleton)):
     def changeTable(self, name):
         self.client.changeTable(name)
 
-    def getCount(self):
-        return self.client.getCount()
+    def getCount(self, **kwargs):
+        return self.client.getCount(**kwargs)
 
     def test(self):
         return self.client.test()

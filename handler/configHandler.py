@@ -74,6 +74,18 @@ class ConfigHandler(withMetaclass(Singleton)):
         return int(os.getenv("POOL_SIZE_MIN", setting.POOL_SIZE_MIN))
 
     @LazyProperty
+    def qualifySuccessStreak(self):
+        return int(os.getenv("QUALIFY_SUCCESS_STREAK", setting.QUALIFY_SUCCESS_STREAK))
+
+    @LazyProperty
+    def candidateMaxFailCount(self):
+        return int(os.getenv("CANDIDATE_MAX_FAIL_COUNT", setting.CANDIDATE_MAX_FAIL_COUNT))
+
+    @LazyProperty
+    def qualifiedMaxFailCount(self):
+        return int(os.getenv("QUALIFIED_MAX_FAIL_COUNT", setting.QUALIFIED_MAX_FAIL_COUNT))
+
+    @LazyProperty
     def proxyRegion(self):
         return bool(os.getenv("PROXY_REGION", setting.PROXY_REGION))
 

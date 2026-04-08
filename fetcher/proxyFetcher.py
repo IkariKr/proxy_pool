@@ -15,6 +15,7 @@ __author__ = 'JHao'
 import re
 import json
 from time import sleep
+from urllib.parse import urlparse
 
 from util.webRequest import WebRequest
 
@@ -23,6 +24,28 @@ class ProxyFetcher(object):
     """
     proxy getter
     """
+
+    @staticmethod
+    def _parse_proxifly_proxy_lines(proxy_lines):
+        seen = set()
+        for raw_line in proxy_lines:
+            proxy_line = raw_line.strip()
+            if not proxy_line:
+                continue
+
+            parsed = urlparse(proxy_line)
+            if parsed.scheme not in ("http", "https"):
+                continue
+
+            if not parsed.hostname or not parsed.port:
+                continue
+
+            proxy = "%s:%s" % (parsed.hostname, parsed.port)
+            if proxy in seen:
+                continue
+
+            seen.add(proxy)
+            yield proxy
 
     @staticmethod
     def freeProxy01():
@@ -169,6 +192,48 @@ class ProxyFetcher(object):
                 yield each['ip']
         except Exception as e:
             print(e)
+
+    @staticmethod
+    def freeProxy12():
+        """ Proxifly https://github.com/proxifly/free-proxy-list """
+        # 中文：国内网络访问 raw.githubusercontent.com 经常超时，这里增加 jsDelivr 回退，避免单源失败导致整批抓取失效。
+        # English: raw.githubusercontent.com often times out on CN networks, so we add a jsDelivr fallback to avoid losing the whole batch on a single upstream failure.
+        urls = [
+            "https://raw.githubusercontent.com/proxifly/free-proxy-list/main/proxies/all/data.txt",
+            "https://cdn.jsdelivr.net/gh/proxifly/free-proxy-list@main/proxies/all/data.txt",
+        ]
+        for url in urls:
+            r = WebRequest().get(url, timeout=15)
+            if not r.text:
+                continue
+
+            for proxy in ProxyFetcher._parse_proxifly_proxy_lines(r.text.splitlines()):
+                yield proxy
+            return
+
+    @staticmethod
+    def freeProxy13():
+        """ IPlocate https://github.com/iplocate/free-proxy-list """
+        # 中文：优先走 GitHub Raw，失败后回退到 jsDelivr；同时合并 http/https 清单，交给后续校验流程判定真实协议能力。
+        # English: Prefer GitHub Raw and fall back to jsDelivr; merge the http/https lists and let downstream validation determine actual protocol capability.
+        urls = [
+            "https://raw.githubusercontent.com/iplocate/free-proxy-list/main/protocols/http.txt",
+            "https://raw.githubusercontent.com/iplocate/free-proxy-list/main/protocols/https.txt",
+            "https://cdn.jsdelivr.net/gh/iplocate/free-proxy-list@main/protocols/http.txt",
+            "https://cdn.jsdelivr.net/gh/iplocate/free-proxy-list@main/protocols/https.txt",
+        ]
+        seen = set()
+        for url in urls:
+            r = WebRequest().get(url, timeout=15)
+            if not r.text:
+                continue
+
+            for raw_line in r.text.splitlines():
+                proxy = raw_line.strip()
+                if not proxy or proxy in seen:
+                    continue
+                seen.add(proxy)
+                yield proxy
 
     # @staticmethod
     # def wallProxy01():
