@@ -61,7 +61,15 @@ class DoValidator(object):
 
     @classmethod
     def _probe(cls, proxy_str, url, verify):
-        proxies = {"http": "http://{proxy}".format(proxy=proxy_str), "https": "http://{proxy}".format(proxy=proxy_str)}
+        return cls._probe_with_type(proxy_str, "http", url, verify)
+
+    @classmethod
+    def _probe_with_type(cls, proxy_str, proxy_type, url, verify):
+        scheme = "socks5h" if proxy_type == "socks5" else "http"
+        proxies = {
+            "http": "{scheme}://{proxy}".format(scheme=scheme, proxy=proxy_str),
+            "https": "{scheme}://{proxy}".format(scheme=scheme, proxy=proxy_str)
+        }
         try:
             response = get(url, headers=HEADER, proxies=proxies, timeout=cls.conf.verifyTimeout, verify=verify)
             if response.status_code != 200:
@@ -76,11 +84,11 @@ class DoValidator(object):
 
     @classmethod
     def httpValidator(cls, proxy):
-        return cls._probe(proxy.proxy, cls.conf.httpUrl, verify=False)
+        return cls._probe_with_type(proxy.proxy, proxy.proxy_type, cls.conf.httpUrl, verify=False)
 
     @classmethod
     def httpsValidator(cls, proxy):
-        return cls._probe(proxy.proxy, cls.conf.httpsUrl, verify=False)
+        return cls._probe_with_type(proxy.proxy, proxy.proxy_type, cls.conf.httpsUrl, verify=False)
 
     @classmethod
     def preValidator(cls, proxy):
@@ -119,7 +127,7 @@ class _ThreadChecker(Thread):
                 self.log.info("{}ProxyCheck - {}: complete".format(self.work_type.title(), self.name))
                 break
 
-            stored_proxy = self.proxy_handler.getByProxy(proxy.proxy)
+            stored_proxy = self.proxy_handler.getByProxy(proxy.proxy, proxy_type=proxy.proxy_type)
             if stored_proxy:
                 proxy = merge_proxy_state(proxy, stored_proxy)
 

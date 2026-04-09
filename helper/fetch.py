@@ -35,17 +35,27 @@ class _ThreadFetcher(Thread):
     def run(self):
         self.log.info("ProxyFetch - {func}: start".format(func=self.fetch_source))
         try:
-            for proxy in self.fetcher():
-                self.log.info('ProxyFetch - %s: %s ok' % (self.fetch_source, proxy.ljust(23)))
-                proxy = proxy.strip()
+            for proxy_item in self.fetcher():
+                proxy, proxy_type = self._normalize_proxy_item(proxy_item)
+                self.log.info('ProxyFetch - %s: %s [%s] ok' % (self.fetch_source, proxy.ljust(23), proxy_type))
                 if proxy in self.proxy_dict:
                     self.proxy_dict[proxy].add_source(self.fetch_source)
+                    self.proxy_dict[proxy].proxy_type = proxy_type
                 else:
                     self.proxy_dict[proxy] = Proxy(
-                        proxy, source=self.fetch_source)
+                        proxy, source=self.fetch_source, proxy_type=proxy_type)
         except Exception as e:
             self.log.error("ProxyFetch - {func}: error".format(func=self.fetch_source))
             self.log.error(str(e))
+
+    @staticmethod
+    def _normalize_proxy_item(proxy_item):
+        if isinstance(proxy_item, dict):
+            proxy = str(proxy_item.get("proxy", "")).strip()
+            proxy_type = str(proxy_item.get("proxy_type", "http")).strip() or "http"
+            return proxy, proxy_type
+
+        return str(proxy_item).strip(), "http"
 
 
 class Fetcher(object):

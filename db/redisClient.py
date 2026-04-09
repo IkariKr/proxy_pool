@@ -47,28 +47,47 @@ class RedisClient(object):
                                                                    socket_timeout=5,
                                                                    **kwargs))
 
-    def _filtered_items(self, https=False, qualified_only=False):
+    def _proxy_key(self, proxy_str, proxy_type="http"):
+        return "%s|%s" % (proxy_type or "http", proxy_str)
+
+    def _resolve_keys(self, proxy_str, proxy_type=None):
+        if proxy_type:
+            return [self._proxy_key(proxy_str, proxy_type), proxy_str]
+        return [
+            self._proxy_key(proxy_str, "http"),
+            self._proxy_key(proxy_str, "socks5"),
+            proxy_str
+        ]
+
+    def _filtered_items(self, https=False, qualified_only=False, proxy_type="http"):
         items = self.__conn.hvals(self.name)
         proxies = []
         for item in items:
             proxy_data = json.loads(item)
-            if https and not proxy_data.get("https"):
+            current_type = proxy_data.get("proxy_type", "http")
+            if proxy_type == "socks5":
+                if current_type != "socks5":
+                    continue
+            else:
+                if current_type == "socks5":
+                    continue
+            if https and proxy_type != "socks5" and not proxy_data.get("https"):
                 continue
             if qualified_only and not proxy_data.get("qualified"):
                 continue
             proxies.append(item)
         return proxies
 
-    def _choice_proxy(self, https=False, qualified_only=False):
-        proxies = self._filtered_items(https=https, qualified_only=qualified_only)
+    def _choice_proxy(self, https=False, qualified_only=False, proxy_type="http"):
+        proxies = self._filtered_items(https=https, qualified_only=qualified_only, proxy_type=proxy_type)
         return choice(proxies) if proxies else None
 
-    def get(self, https, qualified_only=True):
+    def get(self, https, qualified_only=True, proxy_type="http"):
         """
         杩斿洖涓€涓唬鐞?
         :return:
         """
-        return self._choice_proxy(https=https, qualified_only=qualified_only)
+        return self._choice_proxy(https=https, qualified_only=qualified_only, proxy_type=proxy_type)
 
     def put(self, proxy_obj):
         """
@@ -76,37 +95,48 @@ class RedisClient(object):
         :param proxy_obj: Proxy obj
         :return:
         """
-        data = self.__conn.hset(self.name, proxy_obj.proxy, proxy_obj.to_json)
+        data = self.__conn.hset(self.name, self._proxy_key(proxy_obj.proxy, proxy_obj.proxy_type), proxy_obj.to_json)
         return data
 
-    def pop(self, https):
+    def pop(self, https, proxy_type="http"):
         """
         寮瑰嚭涓€涓唬鐞?
         :return: dict {proxy: value}
         """
-        proxy = self.get(https, qualified_only=True)
+        proxy = self.get(https, qualified_only=True, proxy_type=proxy_type)
         if proxy:
-            self.__conn.hdel(self.name, json.loads(proxy).get("proxy", ""))
+            proxy_data = json.loads(proxy)
+            self.delete(proxy_data.get("proxy", ""), proxy_data.get("proxy_type", proxy_type))
         return proxy if proxy else None
 
-    def delete(self, proxy_str):
+    def delete(self, proxy_str, proxy_type=None):
         """
         绉婚櫎鎸囧畾浠ｇ悊, 浣跨敤changeTable鎸囧畾hash name
         :param proxy_str: proxy str
         :return:
         """
-        return self.__conn.hdel(self.name, proxy_str)
+        deleted = 0
+        for key in self._resolve_keys(proxy_str, proxy_type=proxy_type):
+            deleted += self.__conn.hdel(self.name, key)
+        return deleted
 
-    def exists(self, proxy_str):
+    def exists(self, proxy_str, proxy_type=None):
         """
         鍒ゆ柇鎸囧畾浠ｇ悊鏄惁瀛樺湪, 浣跨敤changeTable鎸囧畾hash name
         :param proxy_str: proxy str
         :return:
         """
-        return self.__conn.hexists(self.name, proxy_str)
+        for key in self._resolve_keys(proxy_str, proxy_type=proxy_type):
+            if self.__conn.hexists(self.name, key):
+                return True
+        return False
 
-    def getByKey(self, proxy_str):
-        return self.__conn.hget(self.name, proxy_str)
+    def getByKey(self, proxy_str, proxy_type=None):
+        for key in self._resolve_keys(proxy_str, proxy_type=proxy_type):
+            proxy = self.__conn.hget(self.name, key)
+            if proxy:
+                return proxy
+        return None
 
     def update(self, proxy_obj):
         """
@@ -114,14 +144,14 @@ class RedisClient(object):
         :param proxy_obj:
         :return:
         """
-        return self.__conn.hset(self.name, proxy_obj.proxy, proxy_obj.to_json)
+        return self.__conn.hset(self.name, self._proxy_key(proxy_obj.proxy, proxy_obj.proxy_type), proxy_obj.to_json)
 
-    def getAll(self, https=False, qualified_only=False):
+    def getAll(self, https=False, qualified_only=False, proxy_type="http"):
         """
         瀛楀吀褰㈠紡杩斿洖鎵€鏈変唬鐞? 浣跨敤changeTable鎸囧畾hash name
         :return:
         """
-        return self._filtered_items(https=https, qualified_only=qualified_only)
+        return self._filtered_items(https=https, qualified_only=qualified_only, proxy_type=proxy_type)
 
     def clear(self):
         """
@@ -130,15 +160,17 @@ class RedisClient(object):
         """
         return self.__conn.delete(self.name)
 
-    def getCount(self, qualified_only=False):
+    def getCount(self, qualified_only=False, proxy_type=None):
         """
         杩斿洖浠ｇ悊鏁伴噺
         :return:
         """
-        proxies = self.getAll(https=False, qualified_only=qualified_only)
+        proxies = self.getAll(https=False, qualified_only=qualified_only, proxy_type=proxy_type or "http")
+        socks5_proxies = self.getAll(https=False, qualified_only=qualified_only, proxy_type="socks5")
         return {
-            'total': len(proxies),
+            'total': len(proxies) + len(socks5_proxies),
             'https': len(list(filter(lambda x: json.loads(x).get("https"), proxies))),
+            'socks5': len(socks5_proxies),
             'qualified': len(list(filter(lambda x: json.loads(x).get("qualified"), proxies))),
         }
 

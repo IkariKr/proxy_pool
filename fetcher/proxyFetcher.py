@@ -34,18 +34,19 @@ class ProxyFetcher(object):
                 continue
 
             parsed = urlparse(proxy_line)
-            if parsed.scheme not in ("http", "https"):
+            if parsed.scheme not in ("http", "https", "socks5"):
                 continue
 
             if not parsed.hostname or not parsed.port:
                 continue
 
             proxy = "%s:%s" % (parsed.hostname, parsed.port)
-            if proxy in seen:
+            key = "%s|%s" % (parsed.scheme, proxy)
+            if key in seen:
                 continue
 
-            seen.add(proxy)
-            yield proxy
+            seen.add(key)
+            yield {"proxy": proxy, "proxy_type": "socks5" if parsed.scheme == "socks5" else "http"}
 
     @staticmethod
     def freeProxy01():
@@ -219,8 +220,10 @@ class ProxyFetcher(object):
         urls = [
             "https://raw.githubusercontent.com/iplocate/free-proxy-list/main/protocols/http.txt",
             "https://raw.githubusercontent.com/iplocate/free-proxy-list/main/protocols/https.txt",
+            "https://raw.githubusercontent.com/iplocate/free-proxy-list/main/protocols/socks5.txt",
             "https://cdn.jsdelivr.net/gh/iplocate/free-proxy-list@main/protocols/http.txt",
             "https://cdn.jsdelivr.net/gh/iplocate/free-proxy-list@main/protocols/https.txt",
+            "https://cdn.jsdelivr.net/gh/iplocate/free-proxy-list@main/protocols/socks5.txt",
         ]
         seen = set()
         for url in urls:
@@ -228,12 +231,14 @@ class ProxyFetcher(object):
             if not r.text:
                 continue
 
+            proxy_type = "socks5" if "socks5" in url else "http"
             for raw_line in r.text.splitlines():
                 proxy = raw_line.strip()
-                if not proxy or proxy in seen:
+                key = "%s|%s" % (proxy_type, proxy)
+                if not proxy or key in seen:
                     continue
-                seen.add(proxy)
-                yield proxy
+                seen.add(key)
+                yield {"proxy": proxy, "proxy_type": proxy_type}
 
     # @staticmethod
     # def wallProxy01():

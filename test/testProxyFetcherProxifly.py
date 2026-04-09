@@ -21,6 +21,7 @@ def testParseProxiflyProxyLines():
     proxies = list(ProxyFetcher._parse_proxifly_proxy_lines(proxy_lines))
 
     assert proxies == [
-        "1.2.3.4:80",
-        "5.6.7.8:443",
+        {"proxy": "1.2.3.4:80", "proxy_type": "http"},
+        {"proxy": "5.6.7.8:443", "proxy_type": "http"},
+        {"proxy": "9.9.9.9:1080", "proxy_type": "socks5"},
     ]

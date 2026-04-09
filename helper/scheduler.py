@@ -39,7 +39,8 @@ def __runProxyCheck():
     proxy_queue = Queue()
     if proxy_handler.db.getCount(qualified_only=True).get("total", 0) < proxy_handler.conf.poolSizeMin:
         __runProxyFetch()
-    for proxy in proxy_handler.getAll(qualified_only=False):
+    for proxy in proxy_handler.getAll(qualified_only=False, proxy_type="http") + \
+            proxy_handler.getAll(qualified_only=False, proxy_type="socks5"):
         proxy_queue.put(proxy)
     Checker("use", proxy_queue)
 

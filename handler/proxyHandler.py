@@ -26,22 +26,22 @@ class ProxyHandler(object):
         self.db = DbClient(self.conf.dbConn)
         self.db.changeTable(self.conf.tableName)
 
-    def get(self, https=False):
+    def get(self, https=False, proxy_type="http"):
         """
         return a proxy
         Args:
             https: True/False
         Returns:
         """
-        proxy = self.db.get(https, qualified_only=True)
+        proxy = self.db.get(https, qualified_only=True, proxy_type=proxy_type)
         return Proxy.createFromJson(proxy) if proxy else None
 
-    def pop(self, https):
+    def pop(self, https, proxy_type="http"):
         """
         return and delete a useful proxy
         :return:
         """
-        proxy = self.db.pop(https)
+        proxy = self.db.pop(https, proxy_type=proxy_type)
         if proxy:
             return Proxy.createFromJson(proxy)
         return None
@@ -59,14 +59,17 @@ class ProxyHandler(object):
         :param proxy:
         :return:
         """
-        return self.db.delete(proxy.proxy)
+        return self.db.delete(proxy.proxy, proxy_type=proxy.proxy_type)
 
-    def getAll(self, https=False, qualified_only=True):
+    def deleteByProxy(self, proxy_str, proxy_type=None):
+        return self.db.delete(proxy_str, proxy_type=proxy_type)
+
+    def getAll(self, https=False, qualified_only=True, proxy_type="http"):
         """
         get all proxy from pool as Proxy list
         :return:
         """
-        proxies = self.db.getAll(https, qualified_only=qualified_only)
+        proxies = self.db.getAll(https, qualified_only=qualified_only, proxy_type=proxy_type)
         return [Proxy.createFromJson(_) for _ in proxies]
 
     def exists(self, proxy):
@@ -75,14 +78,14 @@ class ProxyHandler(object):
         :param proxy:
         :return:
         """
-        return self.db.exists(proxy.proxy)
+        return self.db.exists(proxy.proxy, proxy_type=proxy.proxy_type)
 
-    def getByProxy(self, proxy_str):
-        proxy = self.db.getByKey(proxy_str)
+    def getByProxy(self, proxy_str, proxy_type=None):
+        proxy = self.db.getByKey(proxy_str, proxy_type=proxy_type)
         return Proxy.createFromJson(proxy) if proxy else None
 
     def findByExitIp(self, exit_ip, exclude_proxy=None):
-        for proxy in self.getAll(qualified_only=True):
+        for proxy in self.getAll(qualified_only=True, proxy_type="http") + self.getAll(qualified_only=True, proxy_type="socks5"):
             if proxy.proxy == exclude_proxy:
                 continue
             if proxy.exit_ip == exit_ip:

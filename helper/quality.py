@@ -49,6 +49,8 @@ def merge_proxy_state(current_proxy, stored_proxy):
     current_proxy.https_last_status = stored_proxy.https_last_status
     current_proxy.exit_ip = stored_proxy.exit_ip
     current_proxy.qualified = stored_proxy.qualified
+    if not current_proxy.proxy_type:
+        current_proxy.proxy_type = stored_proxy.proxy_type
     return current_proxy
 
 

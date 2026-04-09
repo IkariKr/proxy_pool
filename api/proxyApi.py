@@ -17,13 +17,17 @@
 __author__ = 'JHao'
 
 import platform
+from pathlib import Path
 from werkzeug.wrappers import Response
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 
 from util.six import iteritems
 from helper.proxy import Proxy
 from handler.proxyHandler import ProxyHandler
 from handler.configHandler import ConfigHandler
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+ADMIN_DIST_DIR = PROJECT_ROOT / "web-admin" / "dist"
 
 app = Flask(__name__)
 conf = ConfigHandler()
@@ -51,22 +55,45 @@ api_list = [
 ]
 
 
+def parse_proxy_type():
+    request_type = request.args.get("type", "").lower()
+    if request_type == 'socks5':
+        return "socks5", False
+    return "http", request_type == 'https'
+
+
 @app.route('/')
 def index():
     return {'url': api_list}
 
 
+@app.route('/admin/')
+@app.route('/admin/<path:asset_path>')
+def admin(asset_path='index.html'):
+    if not ADMIN_DIST_DIR.exists():
+        return {
+            "code": 0,
+            "src": "admin page not built yet, run `npm install && npm run build` in web-admin"
+        }, 404
+
+    target_path = ADMIN_DIST_DIR / asset_path
+    if asset_path != 'index.html' and target_path.exists() and target_path.is_file():
+        return send_from_directory(str(ADMIN_DIST_DIR), asset_path)
+
+    return send_from_directory(str(ADMIN_DIST_DIR), 'index.html')
+
+
 @app.route('/get/')
 def get():
-    https = request.args.get("type", "").lower() == 'https'
-    proxy = proxy_handler.get(https)
+    proxy_type, https = parse_proxy_type()
+    proxy = proxy_handler.get(https, proxy_type=proxy_type)
     return proxy.to_dict if proxy else {"code": 0, "src": "no proxy"}
 
 
 @app.route('/pop/')
 def pop():
-    https = request.args.get("type", "").lower() == 'https'
-    proxy = proxy_handler.pop(https)
+    proxy_type, https = parse_proxy_type()
+    proxy = proxy_handler.pop(https, proxy_type=proxy_type)
     return proxy.to_dict if proxy else {"code": 0, "src": "no proxy"}
 
 
@@ -78,27 +105,34 @@ def refresh():
 
 @app.route('/all/')
 def getAll():
-    https = request.args.get("type", "").lower() == 'https'
+    proxy_type, https = parse_proxy_type()
     qualified_only = request.args.get("scope", "").lower() != 'all'
-    proxies = proxy_handler.getAll(https, qualified_only=qualified_only)
+    proxies = proxy_handler.getAll(https, qualified_only=qualified_only, proxy_type=proxy_type)
     return jsonify([_.to_dict for _ in proxies])
 
 
 @app.route('/delete/', methods=['GET'])
 def delete():
     proxy = request.args.get('proxy')
-    status = proxy_handler.delete(Proxy(proxy))
+    request_type = request.args.get("type", "").lower()
+    if request_type == "socks5":
+        proxy_type = "socks5"
+    elif request_type in ("http", "https"):
+        proxy_type = "http"
+    else:
+        proxy_type = None
+    status = proxy_handler.deleteByProxy(proxy, proxy_type=proxy_type)
     return {"code": 0, "src": status}
 
 
 @app.route('/count/')
 def getCount():
-    proxies = proxy_handler.getAll(qualified_only=True)
-    candidates = proxy_handler.getAll(qualified_only=False)
+    proxies = proxy_handler.getAll(qualified_only=True, proxy_type="http") + proxy_handler.getAll(qualified_only=True, proxy_type="socks5")
+    candidates = proxy_handler.getAll(qualified_only=False, proxy_type="http") + proxy_handler.getAll(qualified_only=False, proxy_type="socks5")
     http_type_dict = {}
     source_dict = {}
     for proxy in proxies:
-        http_type = 'https' if proxy.https else 'http'
+        http_type = proxy.proxy_type if proxy.proxy_type == 'socks5' else ('https' if proxy.https else 'http')
         http_type_dict[http_type] = http_type_dict.get(http_type, 0) + 1
         for source in proxy.source.split('/'):
             source_dict[source] = source_dict.get(source, 0) + 1

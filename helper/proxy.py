@@ -20,7 +20,8 @@ class Proxy(object):
     def __init__(self, proxy, fail_count=0, region="", anonymous="",
                  source="", check_count=0, last_status="", last_time="", https=False,
                  score=0, success_streak=0, http_success_streak=0, https_success_streak=0,
-                 http_last_status=False, https_last_status=False, exit_ip="", qualified=False):
+                 http_last_status=False, https_last_status=False, exit_ip="", qualified=False,
+                 proxy_type="http"):
         self._proxy = proxy
         self._fail_count = fail_count
         self._region = region
@@ -38,6 +39,7 @@ class Proxy(object):
         self._https_last_status = https_last_status
         self._exit_ip = exit_ip
         self._qualified = qualified
+        self._proxy_type = proxy_type
 
     @classmethod
     def createFromJson(cls, proxy_json):
@@ -58,7 +60,8 @@ class Proxy(object):
                    http_last_status=_dict.get("http_last_status", False),
                    https_last_status=_dict.get("https_last_status", False),
                    exit_ip=_dict.get("exit_ip", ""),
-                   qualified=_dict.get("qualified", False)
+                   qualified=_dict.get("qualified", False),
+                   proxy_type=_dict.get("proxy_type", "http")
                    )
 
     @property
@@ -139,6 +142,10 @@ class Proxy(object):
         return self._qualified
 
     @property
+    def proxy_type(self):
+        return self._proxy_type
+
+    @property
     def to_dict(self):
         """ 灞炴€у瓧鍏?"""
         return {"proxy": self.proxy,
@@ -157,7 +164,8 @@ class Proxy(object):
                 "http_last_status": self.http_last_status,
                 "https_last_status": self.https_last_status,
                 "exit_ip": self.exit_ip,
-                "qualified": self.qualified}
+                "qualified": self.qualified,
+                "proxy_type": self.proxy_type}
 
     @property
     def to_json(self):
@@ -219,6 +227,10 @@ class Proxy(object):
     @qualified.setter
     def qualified(self, value):
         self._qualified = value
+
+    @proxy_type.setter
+    def proxy_type(self, value):
+        self._proxy_type = value or "http"
 
     def add_source(self, source_str):
         if source_str:

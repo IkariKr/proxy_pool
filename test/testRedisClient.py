@@ -12,6 +12,14 @@
 """
 __author__ = 'JHao'
 
+import os
+import sys
+import unittest
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from db.redisClient import RedisClient
+
 
 def testRedisClient():
     from db.dbClient import DbClient
@@ -37,5 +45,20 @@ def testRedisClient():
     print("getCount", db.getCount())
 
 
+class RedisClientKeyTests(unittest.TestCase):
+
+    def test_resolve_keys_include_protocol_and_legacy_key(self):
+        client = object.__new__(RedisClient)
+
+        self.assertEqual(
+            client._resolve_keys("1.2.3.4:80", proxy_type="socks5"),
+            ["socks5|1.2.3.4:80", "1.2.3.4:80"]
+        )
+        self.assertEqual(
+            client._resolve_keys("1.2.3.4:80"),
+            ["http|1.2.3.4:80", "socks5|1.2.3.4:80", "1.2.3.4:80"]
+        )
+
+
 if __name__ == '__main__':
-    testRedisClient()
+    unittest.main()

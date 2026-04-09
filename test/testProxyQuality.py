@@ -7,7 +7,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from helper.proxy import Proxy
-from helper.quality import apply_validation_result, extract_exit_ip, is_better_proxy
+from helper.quality import apply_validation_result, extract_exit_ip, is_better_proxy, merge_proxy_state
 
 
 class ProxyQualityTests(unittest.TestCase):
@@ -31,6 +31,16 @@ class ProxyQualityTests(unittest.TestCase):
         stored_proxy = Proxy("5.6.7.8:81", score=1, success_streak=1, http_success_streak=1,
                              qualified=False, https=False)
         self.assertTrue(is_better_proxy(current_proxy, stored_proxy))
+
+    def test_merge_proxy_state_keeps_current_proxy_type(self):
+        current_proxy = Proxy("1.2.3.4:80", source="freeProxy13", proxy_type="socks5")
+        stored_proxy = Proxy("1.2.3.4:80", source="freeProxy12", proxy_type="http", score=5)
+
+        merged_proxy = merge_proxy_state(current_proxy, stored_proxy)
+
+        self.assertEqual(merged_proxy.proxy_type, "socks5")
+        self.assertEqual(merged_proxy.score, 5)
+        self.assertIn("freeProxy12", merged_proxy.source)
 
 
 if __name__ == '__main__':
