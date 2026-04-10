@@ -26,6 +26,24 @@ class ProxyFetcher(object):
     """
 
     @staticmethod
+    def _parse_plain_proxy_lines(proxy_lines, proxy_type="http"):
+        seen = set()
+        for raw_line in proxy_lines:
+            proxy = raw_line.strip()
+            if not proxy:
+                continue
+
+            if not re.match(r"^\d{1,3}(?:\.\d{1,3}){3}:\d+$", proxy):
+                continue
+
+            key = "%s|%s" % (proxy_type, proxy)
+            if key in seen:
+                continue
+
+            seen.add(key)
+            yield {"proxy": proxy, "proxy_type": proxy_type}
+
+    @staticmethod
     def _parse_proxifly_proxy_lines(proxy_lines):
         seen = set()
         for raw_line in proxy_lines:
@@ -239,6 +257,77 @@ class ProxyFetcher(object):
                     continue
                 seen.add(key)
                 yield {"proxy": proxy, "proxy_type": proxy_type}
+
+    @staticmethod
+    def freeProxy14():
+        """ ProxyScraper https://github.com/ProxyScraper/ProxyScraper """
+        urls = [
+            "https://raw.githubusercontent.com/ProxyScraper/ProxyScraper/main/http.txt",
+            "https://raw.githubusercontent.com/ProxyScraper/ProxyScraper/main/socks5.txt",
+            "https://cdn.jsdelivr.net/gh/ProxyScraper/ProxyScraper@main/http.txt",
+            "https://cdn.jsdelivr.net/gh/ProxyScraper/ProxyScraper@main/socks5.txt",
+        ]
+        seen = set()
+        for url in urls:
+            r = WebRequest().get(url, timeout=15)
+            if not r.text:
+                continue
+
+            proxy_type = "socks5" if "socks5" in url else "http"
+            for proxy_item in ProxyFetcher._parse_plain_proxy_lines(r.text.splitlines(), proxy_type=proxy_type):
+                key = "%s|%s" % (proxy_item["proxy_type"], proxy_item["proxy"])
+                if key in seen:
+                    continue
+                seen.add(key)
+                yield proxy_item
+
+    @staticmethod
+    def freeProxy15():
+        """ TheSpeedX https://github.com/TheSpeedX/PROXY-List """
+        urls = [
+            "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt",
+            "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/socks5.txt",
+            "https://cdn.jsdelivr.net/gh/TheSpeedX/PROXY-List@master/http.txt",
+            "https://cdn.jsdelivr.net/gh/TheSpeedX/PROXY-List@master/socks5.txt",
+        ]
+        seen = set()
+        for url in urls:
+            r = WebRequest().get(url, timeout=15)
+            if not r.text:
+                continue
+
+            proxy_type = "socks5" if "socks5" in url else "http"
+            for proxy_item in ProxyFetcher._parse_plain_proxy_lines(r.text.splitlines(), proxy_type=proxy_type):
+                key = "%s|%s" % (proxy_item["proxy_type"], proxy_item["proxy"])
+                if key in seen:
+                    continue
+                seen.add(key)
+                yield proxy_item
+
+    @staticmethod
+    def freeProxy16():
+        """ Fresh Proxy List https://github.com/fyvri/fresh-proxy-list """
+        urls = [
+            "https://raw.githubusercontent.com/fyvri/fresh-proxy-list/archive/storage/classic/http.txt",
+            "https://raw.githubusercontent.com/fyvri/fresh-proxy-list/archive/storage/classic/https.txt",
+            "https://raw.githubusercontent.com/fyvri/fresh-proxy-list/archive/storage/classic/socks5.txt",
+            "https://cdn.jsdelivr.net/gh/fyvri/fresh-proxy-list@archive/storage/classic/http.txt",
+            "https://cdn.jsdelivr.net/gh/fyvri/fresh-proxy-list@archive/storage/classic/https.txt",
+            "https://cdn.jsdelivr.net/gh/fyvri/fresh-proxy-list@archive/storage/classic/socks5.txt",
+        ]
+        seen = set()
+        for url in urls:
+            r = WebRequest().get(url, timeout=15)
+            if not r.text:
+                continue
+
+            proxy_type = "socks5" if "socks5" in url else "http"
+            for proxy_item in ProxyFetcher._parse_plain_proxy_lines(r.text.splitlines(), proxy_type=proxy_type):
+                key = "%s|%s" % (proxy_item["proxy_type"], proxy_item["proxy"])
+                if key in seen:
+                    continue
+                seen.add(key)
+                yield proxy_item
 
     # @staticmethod
     # def wallProxy01():

@@ -29,20 +29,42 @@ function Write-Ok {
     Write-Host "[ OK ] $Message" -ForegroundColor Green
 }
 
-function Get-ProxyPoolProcess {
+function Get-ProxyPoolProcesses {
     param(
         [Parameter(Mandatory = $true)]
         [string]$Role
     )
 
-    $escapedRoot = [Regex]::Escape($script:ProjectRoot)
     Get-CimInstance Win32_Process |
         Where-Object {
             $_.Name -eq "python.exe" -and
-            $_.CommandLine -match $escapedRoot -and
+            $_.CommandLine -match "proxyPool\.py" -and
             $_.CommandLine -match "proxyPool\.py\s+$Role(\s|$)"
-        } |
-        Select-Object -First 1
+        }
+}
+
+function Stop-ProxyPoolProcesses {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Role
+    )
+
+    $processes = @(Get-ProxyPoolProcesses -Role $Role)
+    if ($processes.Count -eq 0) {
+        return
+    }
+
+    Write-Info "Stopping existing ProxyPool $Role process(es): $($processes.Count)"
+    foreach ($process in $processes) {
+        try {
+            Stop-Process -Id $process.ProcessId -Force -ErrorAction Stop
+        }
+        catch {
+            Write-WarnLine "Failed to stop PID=$($process.ProcessId): $($_.Exception.Message)"
+        }
+    }
+
+    Start-Sleep -Seconds 1
 }
 
 function Test-ApiReady {
@@ -130,35 +152,26 @@ if (-not $redisReady) {
 
 Write-Ok "Redis is ready"
 
-$serverProcess = Get-ProxyPoolProcess -Role "server"
-if ($null -eq $serverProcess) {
-    Write-Info "Starting ProxyPool API server"
-    Start-Process `
-        -FilePath $pythonExe `
-        -ArgumentList "proxyPool.py", "server" `
-        -WorkingDirectory $script:ProjectRoot `
-        -RedirectStandardOutput $serverStdout `
-        -RedirectStandardError $serverStderr |
-        Out-Null
-}
-else {
-    Write-WarnLine "API server already running, PID=$($serverProcess.ProcessId)"
-}
+Stop-ProxyPoolProcesses -Role "server"
+Stop-ProxyPoolProcesses -Role "schedule"
 
-$scheduleProcess = Get-ProxyPoolProcess -Role "schedule"
-if ($null -eq $scheduleProcess) {
-    Write-Info "Starting ProxyPool scheduler"
-    Start-Process `
-        -FilePath $pythonExe `
-        -ArgumentList "proxyPool.py", "schedule" `
-        -WorkingDirectory $script:ProjectRoot `
-        -RedirectStandardOutput $scheduleStdout `
-        -RedirectStandardError $scheduleStderr |
-        Out-Null
-}
-else {
-    Write-WarnLine "Scheduler already running, PID=$($scheduleProcess.ProcessId)"
-}
+Write-Info "Starting ProxyPool API server"
+Start-Process `
+    -FilePath $pythonExe `
+    -ArgumentList "proxyPool.py", "server" `
+    -WorkingDirectory $script:ProjectRoot `
+    -RedirectStandardOutput $serverStdout `
+    -RedirectStandardError $serverStderr |
+    Out-Null
+
+Write-Info "Starting ProxyPool scheduler"
+Start-Process `
+    -FilePath $pythonExe `
+    -ArgumentList "proxyPool.py", "schedule" `
+    -WorkingDirectory $script:ProjectRoot `
+    -RedirectStandardOutput $scheduleStdout `
+    -RedirectStandardError $scheduleStderr |
+    Out-Null
 
 Write-Info "Waiting for API readiness"
 $apiContent = $null

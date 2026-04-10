@@ -1,27 +1,30 @@
 # -*- coding: utf-8 -*-
 """
 -------------------------------------------------
-   File Name：     proxyScheduler
+   File Name:    proxyScheduler
    Description :
-   Author :        JHao
-   date：          2019/8/5
+   Author :      JHao
+   date:         2019/8/5
 -------------------------------------------------
    Change Activity:
                    2019/08/05: proxyScheduler
-                   2021/02/23: runProxyCheck时,剩余代理少于POOL_SIZE_MIN时执行抓取
+                   2021/02/23: runProxyCheck 时, 剩余代理少于 POOL_SIZE_MIN 时执行抓取
 -------------------------------------------------
 """
 __author__ = 'JHao'
 
-from apscheduler.schedulers.blocking import BlockingScheduler
-from apscheduler.executors.pool import ProcessPoolExecutor
+from datetime import datetime
+import platform
 
-from util.six import Queue
-from helper.fetch import Fetcher
+from apscheduler.executors.pool import ProcessPoolExecutor
+from apscheduler.schedulers.blocking import BlockingScheduler
+
 from helper.check import Checker
+from helper.fetch import Fetcher
+from handler.configHandler import ConfigHandler
 from handler.logHandler import LogHandler
 from handler.proxyHandler import ProxyHandler
-from handler.configHandler import ConfigHandler
+from util.six import Queue
 
 
 def __runProxyFetch():
@@ -46,25 +49,27 @@ def __runProxyCheck():
 
 
 def runScheduler():
-    __runProxyFetch()
-
     timezone = ConfigHandler().timezone
     scheduler_log = LogHandler("scheduler")
     scheduler = BlockingScheduler(logger=scheduler_log, timezone=timezone)
 
-    scheduler.add_job(__runProxyFetch, 'interval', minutes=4, id="proxy_fetch", name="proxy采集")
-    scheduler.add_job(__runProxyCheck, 'interval', minutes=2, id="proxy_check", name="proxy检查")
+    # 中文：预热检查交给调度器立即执行，避免启动时同步抓取阻塞后续定时复检。
+    # English: Let the scheduler trigger the bootstrap check immediately so startup fetches do not block recurring checks.
+    scheduler.add_job(__runProxyCheck, 'date', run_date=datetime.now(), id="proxy_bootstrap_check",
+                      name="proxy_bootstrap")
+    scheduler.add_job(__runProxyFetch, 'interval', minutes=4, id="proxy_fetch", name="proxy_fetch")
+    scheduler.add_job(__runProxyCheck, 'interval', minutes=2, id="proxy_check", name="proxy_check")
     executors = {
-        'default': {'type': 'threadpool', 'max_workers': 20},
-        'processpool': ProcessPoolExecutor(max_workers=5)
+        'default': {'type': 'threadpool', 'max_workers': 20}
     }
+    if platform.system() != "Windows":
+        executors['processpool'] = ProcessPoolExecutor(max_workers=5)
     job_defaults = {
         'coalesce': False,
         'max_instances': 10
     }
 
     scheduler.configure(executors=executors, job_defaults=job_defaults, timezone=timezone)
-
     scheduler.start()
 
 

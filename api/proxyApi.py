@@ -147,7 +147,9 @@ def getCount():
 
 def runFlask():
     if platform.system() == "Windows":
-        app.run(host=conf.serverHost, port=conf.serverPort)
+        # 中文：Windows 下显式关闭 reloader，避免开发服务器派生重复的 python 进程。
+        # English: Disable the reloader on Windows explicitly to avoid duplicate Python worker processes.
+        app.run(host=conf.serverHost, port=conf.serverPort, use_reloader=False)
     else:
         import gunicorn.app.base
 
